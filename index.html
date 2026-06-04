@@ -55,7 +55,8 @@ body{display:flex;flex-direction:column}
 
 /* STATS */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.stat-card{background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:14px 16px}
+.stat-card{background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:14px 16px;cursor:pointer;transition:border-color .2s,background .2s}
+.stat-card:hover{border-color:var(--green2);background:var(--bg3)}
 .stat-val{font-size:28px;font-weight:700;color:var(--green);line-height:1}
 .stat-lbl{font-size:11px;color:var(--text3);margin-top:4px;letter-spacing:0.5px;text-transform:uppercase}
 .stat-sub{font-size:11px;color:var(--text2);margin-top:2px}
@@ -191,43 +192,43 @@ td.nome:hover{color:var(--green)}
     <p style="font-size:12px;color:var(--text3);margin-top:4px">Dados importados: 2020 – 2025</p>
   </div>
   <div class="stats-grid">
-    <div class="stat-card">
+    <div class="stat-card" onclick="goToEmpresas('TODAS','TODOS','TODOS')" title="Ver todas as empresas">
       <div class="stat-val" id="st-total">0</div>
       <div class="stat-lbl">Total de Empresas</div>
       <div class="stat-sub" id="st-anos"></div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" onclick="goToEmpresas('RODANDO','TODOS','TODOS')" title="Ver empresas rodando">
       <div class="stat-val" id="st-rodando">0</div>
       <div class="stat-lbl">Rodando</div>
       <div class="stat-sub">Licença ativa</div>
     </div>
-    <div class="stat-card warn">
+    <div class="stat-card warn" onclick="goToEmpresas('ANÁLISE','TODOS','TODOS')" title="Ver empresas em análise">
       <div class="stat-val" id="st-analise">0</div>
       <div class="stat-lbl">Em Análise</div>
       <div class="stat-sub">Aguardando</div>
     </div>
-    <div class="stat-card danger">
+    <div class="stat-card danger" onclick="goToEmpresas('SUSPENSA','TODOS','TODOS')" title="Ver empresas suspensas">
       <div class="stat-val" id="st-suspensa">0</div>
       <div class="stat-lbl">Suspensas</div>
       <div class="stat-sub">Inativas/suspensas</div>
     </div>
   </div>
   <div class="stats-grid" style="margin-top:0">
-    <div class="stat-card danger">
+    <div class="stat-card danger" onclick="goToEmpresas('TODAS','TODOS','EXPIRED')" title="Ver licenças vencidas">
       <div class="stat-val" id="st-expired">0</div>
       <div class="stat-lbl">Vencidas (sem renovação)</div>
       <div class="stat-sub">Data passada</div>
     </div>
-    <div class="stat-card warn">
+    <div class="stat-card warn" onclick="goToEmpresas('TODAS','TODOS','SOON')" title="Ver licenças a vencer em 6 meses">
       <div class="stat-val" id="st-soon">0</div>
       <div class="stat-lbl">Vencem em 6 meses</div>
       <div class="stat-sub">Atenção imediata</div>
     </div>
-    <div class="stat-card info">
+    <div class="stat-card info" onclick="goToEmpresas('TODAS','TODOS','2026')" title="Ver licenças que vencem em 2026">
       <div class="stat-val" id="st-2026">0</div>
       <div class="stat-lbl">Vencem em 2026</div>
     </div>
-    <div class="stat-card info">
+    <div class="stat-card info" onclick="goToEmpresas('TODAS','TODOS','2027PLUS')" title="Ver licenças que vencem em 2027 ou mais">
       <div class="stat-val" id="st-2027plus">0</div>
       <div class="stat-lbl">Vencem 2027+</div>
     </div>
@@ -795,6 +796,67 @@ function saveModal(){
 
 function closeModal(e){ if(e.target===document.getElementById('modalOverlay')) closeModalDirect(); }
 function closeModalDirect(){ document.getElementById('modalOverlay').classList.remove('open'); currentItem=null; }
+
+function goToEmpresas(situ, ano, venc){
+  situFilter = situ;
+  anoFilter = ano;
+  vencFilter = venc;
+
+  // handle SUSPENSA — also activate SUSPENSO visually
+  document.querySelectorAll('[id^="filt-"]').forEach(b=>b.classList.remove('active'));
+  if(situ==='SUSPENSA'){
+    document.getElementById('filt-SUSPENSA')?.classList.add('active');
+  } else {
+    document.getElementById('filt-'+situ)?.classList.add('active');
+  }
+
+  document.querySelectorAll('[id^="ano-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ano-'+ano)?.classList.add('active');
+
+  document.querySelectorAll('[id^="vf-"]').forEach(b=>b.classList.remove('active'));
+  if(venc==='SOON') document.getElementById('vf-SOON')?.classList.add('active');
+  else if(venc==='EXPIRED') document.getElementById('vf-EXPIRED')?.classList.add('active');
+  else if(venc==='2026') document.getElementById('vf-2026')?.classList.add('active');
+  else if(venc==='2027PLUS') document.getElementById('vf-2027')?.classList.add('active');
+  else document.getElementById('vf-TODOS')?.classList.add('active');
+
+  // if 2027+ use custom filter
+  if(venc==='2027PLUS'){
+    vencFilter = '2027PLUS';
+  }
+
+  switchPage('empresas');
+}
+
+// patch applyFilters to support 2027PLUS
+const _origApply = applyFilters;
+applyFilters = function(){
+  let d = [...rawData];
+  if(situFilter === 'SUSPENSA') d = d.filter(x => ['SUSPENSA','SUSPENSO'].includes(getStatus(x)));
+  else if(situFilter !== 'TODAS') d = d.filter(x => getStatus(x) === situFilter);
+  if(anoFilter !== 'TODOS') d = d.filter(x => x.ano === anoFilter);
+  if(vencFilter === 'SOON') d = d.filter(isExpiringSoon);
+  else if(vencFilter === 'EXPIRED') d = d.filter(isExpired);
+  else if(vencFilter === '2027PLUS') d = d.filter(x=>{ const dd=parseDate(x.dataValidade); return dd&&dd.getFullYear()>=2027; });
+  else if(['2026','2027','2028'].includes(vencFilter)){
+    d = d.filter(x => { const dd=parseDate(x.dataValidade); return dd && dd.getFullYear()===+vencFilter; });
+  }
+  const q = (document.getElementById('searchInput')||{value:''}).value.toLowerCase();
+  if(q) d = d.filter(x => (x.nomeEmpresa+x.nomeDono+x.cnpj+x.indicacao).toLowerCase().includes(q));
+  const sort = (document.getElementById('sortSelect')||{value:'nome'}).value;
+  d.sort((a,b)=>{
+    if(sort==='nome') return a.nomeEmpresa.localeCompare(b.nomeEmpresa,'pt');
+    if(sort==='ano') return (+b.ano||0)-(+a.ano||0);
+    if(sort==='validade'){
+      const da=parseDate(a.dataValidade)||new Date(9999,0,1);
+      const db=parseDate(b.dataValidade)||new Date(9999,0,1);
+      return da-db;
+    }
+    if(sort==='situacao') return getStatus(a).localeCompare(getStatus(b));
+    return 0;
+  });
+  filteredData = d;
+};
 
 // Init
 updateDashboard();
