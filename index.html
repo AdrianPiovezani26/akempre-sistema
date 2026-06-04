@@ -719,7 +719,7 @@ function renderRen(){
     const hs=x.statusRen&&x.statusRen.trim();
     return hr||hs;
   });
-  const show=rf==='TODOS'?items:items.filter(x=>(x.statusRen||')===rf);
+  const show=rf==='TODOS'?items:items.filter(x=>(x.statusRen||'')=== rf);
 
   // Counts per status
   const counts={};
