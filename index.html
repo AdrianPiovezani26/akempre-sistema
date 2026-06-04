@@ -19,7 +19,7 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'S
 body{display:flex;flex-direction:column}
 
 /* HEADER */
-.header{background:linear-gradient(180deg,#050a05 0%,var(--bg2) 100%);border-bottom:1px solid var(--border2);padding:0 24px;display:flex;align-items:center;gap:20px;height:64px;position:sticky;top:0;z-index:100}
+.header{background:linear-gradient(180deg,#050a05 0%,var(--bg2) 100%);border-bottom:1px solid var(--border2);padding:0 24px;height:64px;position:sticky;top:0;z-index:100}
 .logo-area{display:flex;align-items:center;gap:14px}
 .logo-icon{width:44px;height:44px;border:1.5px solid var(--green3);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px}
 .logo-diamond{width:18px;height:18px;border:1.5px solid var(--green3);transform:rotate(45deg)}
@@ -144,6 +144,10 @@ td.nome:hover{color:var(--green)}
 .empty-state .empty-icon{font-size:48px;margin-bottom:16px;opacity:0.4}
 .empty-state p{font-size:14px}
 
+/* CENTERING */
+.page-center{max-width:1400px;margin:0 auto;width:100%}
+.header-inner{max-width:1400px;margin:0 auto;width:100%;display:flex;align-items:center;gap:20px;height:100%}
+
 /* RESPONSIVE */
 @media(max-width:900px){
   .stats-grid{grid-template-columns:repeat(2,1fr)}
@@ -153,11 +157,12 @@ td.nome:hover{color:var(--green)}
 </head>
 <body>
 
-<div class="alert-bar" id="alertBar" style="display:none">
+<div class="alert-bar" id="alertBar" style="display:none"><div style="max-width:1400px;margin:0 auto;width:100%;display:flex;align-items:center;gap:12px">
   ⚠ <strong>Atenção:</strong> <span class="alert-count" id="alertCount">0</span> licenças vencem nos próximos 6 meses — <span onclick="switchPage('vencimentos')">ver todas</span>
-</div>
+</div></div>
 
 <div class="header">
+  <div class="header-inner">
   <div class="logo-area">
     <div class="logo-icon">
       <div class="logo-diamond"></div>
@@ -175,10 +180,12 @@ td.nome:hover{color:var(--green)}
     <button class="nav-btn" onclick="switchPage('vencimentos')">Vencimentos</button>
     <button class="nav-btn" onclick="switchPage('renovacoes')">Renovações</button>
   </div>
+  </div>
 </div>
 
 <!-- DASHBOARD PAGE -->
 <div id="page-dashboard" class="page active" style="padding:24px 32px">
+<div class="page-center">
   <div style="margin-bottom:20px">
     <h1 style="font-size:20px;color:var(--green);font-weight:700;letter-spacing:1px">PAINEL GERAL</h1>
     <p style="font-size:12px;color:var(--text3);margin-top:4px">Dados importados: 2020 – 2025</p>
@@ -241,6 +248,7 @@ td.nome:hover{color:var(--green)}
     <div style="font-size:11px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:14px">⚡ Próximos vencimentos (6 meses)</div>
     <div id="upcoming-list"></div>
   </div>
+</div>
 </div>
 
 <!-- EMPRESAS PAGE -->
@@ -320,6 +328,7 @@ td.nome:hover{color:var(--green)}
 
 <!-- VENCIMENTOS PAGE -->
 <div id="page-vencimentos" class="page" style="display:none;padding:24px 32px">
+<div class="page-center">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
     <div>
       <h1 style="font-size:20px;color:var(--green);font-weight:700;letter-spacing:1px">CONTROLE DE VENCIMENTOS</h1>
@@ -336,14 +345,17 @@ td.nome:hover{color:var(--green)}
   </div>
   <div id="vencimentosContent"></div>
 </div>
+</div>
 
 <!-- RENOVAÇÕES PAGE -->
 <div id="page-renovacoes" class="page" style="display:none;padding:24px 32px">
+<div class="page-center">
   <div style="margin-bottom:20px">
     <h1 style="font-size:20px;color:var(--green);font-weight:700;letter-spacing:1px">RENOVAÇÕES</h1>
     <p style="font-size:12px;color:var(--text3);margin-top:4px">Empresas com renovações registradas</p>
   </div>
   <div id="renovacoesContent"></div>
+</div>
 </div>
 
 <!-- MODAL -->
@@ -614,7 +626,7 @@ function updateDashboard(){
 
 function renderVencimentos(){
   const yf = document.getElementById('vencYearFilter').value;
-  let items = rawData.filter(x=>x.dataValidade&&parseDate(x.dataValidade));
+  let items = rawData.filter(x=>x.dataValidade&&parseDate(x.dataValidade)&&!['SUSPENSA','SUSPENSO'].includes(getStatus(x)));
   if(yf!=='TODOS'){
     const yr = +yf;
     if(yf==='2029') items = items.filter(x=>{ const d=parseDate(x.dataValidade); return d&&d.getFullYear()>=2029; });
