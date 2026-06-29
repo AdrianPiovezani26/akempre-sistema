@@ -379,7 +379,8 @@ td.cn:hover{color:var(--green)}
 </div>
 
 <script>
-const TODAY = new Date('2026-06-04');
+const TODAY = new Date();
+TODAY.setHours(0,0,0,0);
 const SIX_MO = new Date(TODAY);
 SIX_MO.setMonth(SIX_MO.getMonth() + 6);
 
