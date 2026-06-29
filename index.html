@@ -313,20 +313,35 @@ td.cn:hover{color:var(--green)}
 <!-- VENCIMENTOS -->
 <div id="page-vencimentos" class="page pg-pad" style="display:none">
 <div class="page-wrap">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-    <div>
-      <h1 style="font-size:20px;color:var(--green);font-weight:700;letter-spacing:1px">CONTROLE DE VENCIMENTOS</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:4px">Apenas licenças ativas (RODANDO) — suspensas excluídas</p>
-    </div>
-    <select class="csel" id="vYearF" onchange="renderVenc()">
-      <option value="TODOS">Todos os anos</option>
-      <option value="2025">2025</option>
-      <option value="2026">2026</option>
-      <option value="2027">2027</option>
-      <option value="2028">2028</option>
-      <option value="2029P">2029+</option>
-    </select>
+  <div style="margin-bottom:14px">
+    <h1 style="font-size:20px;color:var(--green);font-weight:700;letter-spacing:1px">CONTROLE DE VENCIMENTOS</h1>
+    <p style="font-size:12px;color:var(--text3);margin-top:4px">Apenas licenças ativas (RODANDO) — suspensas excluídas</p>
   </div>
+
+  <div class="chips" style="margin-bottom:6px">
+    <button class="chip active" id="vp-1M" onclick="setVPeriod('1M')">📅 1 mês</button>
+    <button class="chip" id="vp-3M" onclick="setVPeriod('3M')">📅 3 meses</button>
+    <button class="chip" id="vp-6M" onclick="setVPeriod('6M')">📅 6 meses</button>
+    <button class="chip" id="vp-ALL" onclick="setVPeriod('ALL')">📅 Todos</button>
+    <button class="chip" id="vp-CUSTOM" onclick="setVPeriod('CUSTOM')">🛠 Personalizado</button>
+  </div>
+
+  <div id="vCustomBox" class="card" style="display:none;margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Data inicial</label>
+        <input type="date" id="vDateStart" class="csel" style="padding:7px 10px">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Data final</label>
+        <input type="date" id="vDateEnd" class="csel" style="padding:7px 10px">
+      </div>
+      <button class="btn-s" onclick="applyCustomVenc()">Filtrar</button>
+      <span style="font-size:12px;color:var(--text3)" id="vCustomMsg"></span>
+    </div>
+  </div>
+
+  <div id="vSummary" style="font-size:12px;color:var(--text3);margin-bottom:12px"></div>
   <div id="vContent"></div>
 </div>
 </div>
@@ -667,13 +682,71 @@ function updateDash(){
 }
 
 // ── VENCIMENTOS ──
-function renderVenc(){
-  const yf=document.getElementById('vYearF').value;
-  let items=rawData.filter(x=>x.dataValidade&&parseDate(x.dataValidade)&&getSit(x)==='RODANDO');
-  if(yf!=='TODOS'){
-    if(yf==='2029P') items=items.filter(x=>{const d=parseDate(x.dataValidade);return d&&d.getFullYear()>=2029;});
-    else items=items.filter(x=>{const d=parseDate(x.dataValidade);return d&&d.getFullYear()===+yf;});
+let vPeriod = '1M';
+let vCustomStart = null;
+let vCustomEnd = null;
+
+function setVPeriod(p){
+  vPeriod = p;
+  document.querySelectorAll('[id^="vp-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('vp-'+p)?.classList.add('active');
+  const box = document.getElementById('vCustomBox');
+  if(p==='CUSTOM'){
+    box.style.display='block';
+    // pre-fill with sensible defaults if empty
+    const s=document.getElementById('vDateStart');
+    const e=document.getElementById('vDateEnd');
+    if(!s.value){
+      const today=new Date(TODAY);
+      s.value = today.toISOString().slice(0,10);
+    }
+    if(!e.value){
+      const future=new Date(TODAY); future.setMonth(future.getMonth()+6);
+      e.value = future.toISOString().slice(0,10);
+    }
+  } else {
+    box.style.display='none';
   }
+  renderVenc();
+}
+
+function applyCustomVenc(){
+  const s = document.getElementById('vDateStart').value;
+  const e = document.getElementById('vDateEnd').value;
+  const msg = document.getElementById('vCustomMsg');
+  if(!s || !e){ msg.textContent='Informe as duas datas.'; msg.style.color='var(--orange)'; return; }
+  if(new Date(s) > new Date(e)){ msg.textContent='Data inicial maior que a final.'; msg.style.color='var(--red)'; return; }
+  vCustomStart = s; vCustomEnd = e;
+  msg.textContent='✓ Filtro aplicado'; msg.style.color='var(--green)';
+  renderVenc();
+}
+
+function renderVenc(){
+  let items=rawData.filter(x=>x.dataValidade&&parseDate(x.dataValidade)&&getSit(x)==='RODANDO');
+  let rangeLabel='';
+
+  if(vPeriod==='ALL'){
+    rangeLabel='Mostrando todos os vencimentos cadastrados';
+  } else if(vPeriod==='CUSTOM'){
+    if(vCustomStart && vCustomEnd){
+      const s=parseDate(vCustomStart.replace(/-/g,'-')) || new Date(vCustomStart);
+      const e=new Date(vCustomEnd);
+      items = items.filter(x=>{ const d=parseDate(x.dataValidade); return d && d>=s && d<=e; });
+      rangeLabel = `Período personalizado: ${fmtDate(vCustomStart)} até ${fmtDate(vCustomEnd)}`;
+    } else {
+      items = [];
+      rangeLabel = 'Defina o período personalizado acima e clique em Filtrar.';
+    }
+  } else {
+    const months = {'1M':1,'3M':3,'6M':6}[vPeriod];
+    const limit = new Date(TODAY);
+    limit.setMonth(limit.getMonth()+months);
+    items = items.filter(x=>{ const d=parseDate(x.dataValidade); return d && d<=limit; });
+    rangeLabel = `Vencimentos até ${fmtDate(limit.toISOString().slice(0,10))} (próximos ${months} ${months===1?'mês':'meses'}) — inclui vencidas`;
+  }
+
+  document.getElementById('vSummary').textContent = rangeLabel + ` · ${items.length} licença(s) encontrada(s)`;
+
   items.sort((a,b)=>parseDate(a.dataValidade)-parseDate(b.dataValidade));
   const groups={};
   items.forEach(item=>{
@@ -684,7 +757,7 @@ function renderVenc(){
   });
   const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const el=document.getElementById('vContent');
-  if(!Object.keys(groups).length){ el.innerHTML='<p style="color:var(--text3)">Nenhum vencimento encontrado.</p>'; return; }
+  if(!Object.keys(groups).length){ el.innerHTML='<p style="color:var(--text3)">Nenhum vencimento encontrado neste período.</p>'; return; }
   el.innerHTML=Object.keys(groups).sort().map(k=>{
     const [yr,mo]=k.split('-');
     const gi=groups[k];
