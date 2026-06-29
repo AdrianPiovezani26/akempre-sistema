@@ -153,6 +153,31 @@ td.cn:hover{color:var(--green)}
 
 @media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr)}.sidebar{width:180px}}
 </style>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBm-F7MmONiCrrfHgHRCAd-w6ZpnPg1YBQ",
+    authDomain: "akempreengenharia.firebaseapp.com",
+    projectId: "akempreengenharia",
+    storageBucket: "akempreengenharia.firebasestorage.app",
+    messagingSenderId: "194145561036",
+    appId: "1:194145561036:web:cebf0e265891094d19d569"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.fbDB = db;
+  window.fbCollection = collection;
+  window.fbDoc = doc;
+  window.fbSetDoc = setDoc;
+  window.fbGetDocs = getDocs;
+  window.fbWriteBatch = writeBatch;
+  window.fbReady = true;
+  window.dispatchEvent(new Event('firebaseReady'));
+</script>
 </head>
 <body>
 
@@ -179,6 +204,10 @@ td.cn:hover{color:var(--green)}
       <button class="nav-btn" onclick="switchPage('empresas')">Empresas</button>
       <button class="nav-btn" onclick="switchPage('vencimentos')">Vencimentos</button>
       <button class="nav-btn" onclick="switchPage('renovacoes')">Renovações</button>
+    </div>
+    <div id="syncStatus" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-left:14px;white-space:nowrap">
+      <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block"></span>
+      <span id="syncText">Conectando...</span>
     </div>
   </div>
 </div>
@@ -284,6 +313,7 @@ td.cn:hover{color:var(--green)}
   </div>
   <div class="main">
     <div class="controls">
+      <button class="btn-s" onclick="openAddModal()" style="white-space:nowrap">+ Adicionar Empresa</button>
       <div class="sbox"><span style="color:var(--text3)">🔍</span><input id="srch" type="text" placeholder="Buscar empresa, CNPJ, dono..." oninput="renderTable()"></div>
       <select class="csel" id="sortSel" onchange="renderTable()">
         <option value="nome">Ordenar: Nome</option>
@@ -374,6 +404,48 @@ td.cn:hover{color:var(--green)}
     <div class="mf">
       <button class="btn-c" onclick="closeModalDirect()">Fechar</button>
       <button class="btn-s" onclick="saveModal()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADICIONAR EMPRESA -->
+<div class="mo" id="modalAdd" onclick="closeAddModal(event)">
+  <div class="md" onclick="event.stopPropagation()">
+    <div class="mh">
+      <div class="mt">➕ Adicionar Nova Empresa</div>
+      <button class="btn-x" onclick="closeAddModalDirect()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="dgrid">
+        <div class="di"><label>Nome da Empresa *</label><input id="add-nome" placeholder="Ex: TRANSPORTES SILVA LTDA"></div>
+        <div class="di"><label>CNPJ *</label><input id="add-cnpj" placeholder="00.000.000/0000-00" oninput="checkCnpjDuplicado()"></div>
+        <div class="di"><label>Responsável / Dono</label><input id="add-dono" placeholder="Nome do responsável"></div>
+        <div class="di"><label>Ano de Entrada *</label><input id="add-ano" placeholder="2026"></div>
+        <div class="di"><label>Indicação</label><input id="add-ind" placeholder="Quem indicou"></div>
+        <div class="di"><label>Valor Fechado (R$)</label><input id="add-valor" placeholder="0"></div>
+        <div class="di"><label>Tipo de Licença</label><input id="add-tipo" placeholder="Ex: LAS, LAI, Bombeiro..."></div>
+        <div class="di">
+          <label>Situação *</label>
+          <select id="add-sit">
+            <option value="ANÁLISE" selected>ANÁLISE</option>
+            <option value="RODANDO">RODANDO</option>
+            <option value="SUSPENSA">SUSPENSA</option>
+            <option value="RENOVANDO">RENOVANDO</option>
+          </select>
+        </div>
+        <div class="di"><label>Data de Validade da Licença</label><input type="date" id="add-data"></div>
+        <div class="di">
+          <label>Status da Renovação</label>
+          <select id="add-sren"></select>
+        </div>
+        <div class="di df"><label>Observação de Renovação</label><input id="add-ren" placeholder="Opcional"></div>
+        <div class="di df"><label>Notas / Leituras</label><textarea id="add-notas" rows="3" placeholder="Observações gerais"></textarea></div>
+      </div>
+      <div id="add-warning" style="display:none;background:#2e1010;border:1px solid #4d1515;color:#cc4040;padding:10px 14px;border-radius:4px;font-size:13px;margin-top:6px"></div>
+    </div>
+    <div class="mf">
+      <button class="btn-c" onclick="closeAddModalDirect()">Cancelar</button>
+      <button class="btn-s" id="add-save-btn" onclick="saveNewCompany()">Salvar Empresa</button>
     </div>
   </div>
 </div>
@@ -560,11 +632,11 @@ function goTo(sit, ano, venc){
 // ── STATUS CHANGE ──
 function chgSit(id, v){
   const item = rawData.find(x=>x.id===id);
-  if(item){ item.situacao=v; updateDash(); updateSidebar(); }
+  if(item){ item.situacao=v; updateDash(); updateSidebar(); salvarEmpresaFirebase(item); }
 }
 function chgRen(id, v){
   const item = rawData.find(x=>x.id===id);
-  if(item){ item.statusRen=v; renderRen(); }
+  if(item){ item.statusRen=v; renderRen(); salvarEmpresaFirebase(item); }
 }
 
 // ── TABLE ──
@@ -885,6 +957,7 @@ function saveModal(){
   curItem.notas=document.getElementById('ed-notas').value;
   closeModalDirect();
   updateDash(); updateSidebar(); renderTable(); renderRen();
+  salvarEmpresaFirebase(curItem);
 }
 function closeModal(e){ if(e.target===document.getElementById('modal')) closeModalDirect(); }
 function closeModalDirect(){ document.getElementById('modal').classList.remove('open'); curItem=null; }
@@ -901,10 +974,168 @@ function switchPage(p){
   if(p==='renovacoes') renderRen();
 }
 
+// ── FIREBASE SYNC ──
+let fbConnected = false;
+let fbMigrationDone = false;
+
+function setSyncStatus(state, text){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  if(!dot||!txt) return;
+  const colors = {ok:'var(--green)', err:'var(--red)', wait:'var(--orange)'};
+  dot.style.background = colors[state]||'var(--text3)';
+  txt.textContent = text;
+}
+
+async function initFirebaseSync(){
+  if(!window.fbReady){
+    window.addEventListener('firebaseReady', initFirebaseSync, {once:true});
+    return;
+  }
+  setSyncStatus('wait','Conectando à nuvem...');
+  try{
+    const db = window.fbDB;
+    const snap = await window.fbGetDocs(window.fbCollection(db,'empresas'));
+    if(snap.empty){
+      // Primeira vez — migrar dados locais (566 empresas) para o Firestore
+      setSyncStatus('wait','Enviando dados iniciais...');
+      await migrarDadosParaFirebase();
+      setSyncStatus('ok','Conectado — dados migrados');
+    } else {
+      // Já existe dados na nuvem — substituir rawData pelos dados do Firestore
+      const cloudItems = [];
+      snap.forEach(d=>cloudItems.push(d.data()));
+      rawData.length = 0;
+      cloudItems.forEach(it=>rawData.push(it));
+      setSyncStatus('ok', `Conectado — ${rawData.length} empresas`);
+    }
+    fbConnected = true;
+    updateDash(); updateSidebar(); renderTable(); renderRen();
+  } catch(err){
+    console.error('Erro Firebase:', err);
+    setSyncStatus('err','Offline — alterações locais apenas');
+  }
+}
+
+async function migrarDadosParaFirebase(){
+  const db = window.fbDB;
+  const BATCH_SIZE = 450;
+  for(let i=0;i<rawData.length;i+=BATCH_SIZE){
+    const batch = window.fbWriteBatch(db);
+    const slice = rawData.slice(i, i+BATCH_SIZE);
+    slice.forEach(item=>{
+      const ref = window.fbDoc(db,'empresas', String(item.id));
+      batch.set(ref, item);
+    });
+    await batch.commit();
+  }
+  fbMigrationDone = true;
+}
+
+async function salvarEmpresaFirebase(item){
+  if(!fbConnected || !window.fbReady){ setSyncStatus('err','Offline — não salvo na nuvem'); return; }
+  try{
+    const db = window.fbDB;
+    await window.fbSetDoc(window.fbDoc(db,'empresas', String(item.id)), item);
+    setSyncStatus('ok', `Conectado — ${rawData.length} empresas`);
+  } catch(err){
+    console.error('Erro ao salvar:', err);
+    setSyncStatus('err','Erro ao salvar na nuvem');
+  }
+}
+
+// ── ADICIONAR EMPRESA ──
+function slugify(s){
+  return removeAccents((s||'').toUpperCase()).replace(/[^A-Z0-9]/g,'').substring(0,12);
+}
+
+function openAddModal(){
+  document.getElementById('add-nome').value='';
+  document.getElementById('add-cnpj').value='';
+  document.getElementById('add-dono').value='';
+  document.getElementById('add-ano').value=String(TODAY.getFullYear());
+  document.getElementById('add-ind').value='';
+  document.getElementById('add-valor').value='';
+  document.getElementById('add-tipo').value='';
+  document.getElementById('add-sit').value='ANÁLISE';
+  document.getElementById('add-data').value='';
+  document.getElementById('add-ren').value='';
+  document.getElementById('add-notas').value='';
+  const sel = document.getElementById('add-sren');
+  if(sel && !sel.options.length){
+    REN_OPTS.forEach(o=>{
+      const opt=document.createElement('option');
+      opt.value=o.v; opt.textContent=o.l;
+      sel.appendChild(opt);
+    });
+  }
+  if(sel) sel.value='';
+  document.getElementById('add-warning').style.display='none';
+  document.getElementById('modalAdd').classList.add('open');
+}
+function closeAddModal(e){ if(e.target===document.getElementById('modalAdd')) closeAddModalDirect(); }
+function closeAddModalDirect(){ document.getElementById('modalAdd').classList.remove('open'); }
+
+function checkCnpjDuplicado(){
+  const cnpjRaw = document.getElementById('add-cnpj').value.replace(/\D/g,'');
+  const warn = document.getElementById('add-warning');
+  if(!cnpjRaw){ warn.style.display='none'; return null; }
+  const found = rawData.find(x=>(x.cnpj||'').replace(/\D/g,'')===cnpjRaw && cnpjRaw.length>=8);
+  if(found){
+    warn.style.display='block';
+    warn.textContent = `⚠ Atenção: já existe uma empresa cadastrada com este CNPJ — "${found.nomeEmpresa}" (ano ${found.ano||'—'}). Verifique antes de salvar para evitar duplicidade.`;
+    return found;
+  }
+  warn.style.display='none';
+  return null;
+}
+
+function saveNewCompany(){
+  const nome = document.getElementById('add-nome').value.trim();
+  const cnpj = document.getElementById('add-cnpj').value.trim();
+  const ano = document.getElementById('add-ano').value.trim();
+
+  if(!nome){ alert('Informe o nome da empresa.'); return; }
+  if(!ano){ alert('Informe o ano de entrada.'); return; }
+
+  const dup = checkCnpjDuplicado();
+  if(dup){
+    const confirmar = confirm(`Já existe "${dup.nomeEmpresa}" com este CNPJ. Deseja salvar mesmo assim como uma empresa nova/separada?`);
+    if(!confirmar) return;
+  }
+
+  const numero = String(rawData.filter(x=>x.ano===ano).length + 1);
+  const newId = `${ano}_${numero}_${slugify(nome)}_${Date.now()}`;
+
+  const newItem = {
+    id: newId,
+    numero: numero,
+    nomeEmpresa: nome,
+    nomeDono: document.getElementById('add-dono').value.trim(),
+    indicacao: document.getElementById('add-ind').value.trim(),
+    ano: ano,
+    valorFechado: document.getElementById('add-valor').value.trim(),
+    cnpj: cnpj,
+    dataValidade: document.getElementById('add-data').value,
+    renovacoes: document.getElementById('add-ren').value.trim(),
+    tipoLicenca: document.getElementById('add-tipo').value.trim(),
+    situacao: document.getElementById('add-sit').value,
+    statusRen: document.getElementById('add-sren').value,
+    notas: document.getElementById('add-notas').value.trim()
+  };
+
+  rawData.push(newItem);
+  closeAddModalDirect();
+  updateDash(); updateSidebar(); renderTable();
+  salvarEmpresaFirebase(newItem);
+  switchPage('empresas');
+}
+
 // ── INIT ──
 updateDash();
 updateSidebar();
 renderTable();
+initFirebaseSync();
 </script>
 </body>
 </html>
